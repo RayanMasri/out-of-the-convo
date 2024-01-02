@@ -19,7 +19,7 @@ export default function Game(props) {
 		chosen: null,
 		pick: null,
 		votes: {},
-		voted: false,
+		voted: [],
 	});
 
 	const navigate = useNavigate();
@@ -28,7 +28,19 @@ export default function Game(props) {
 		socket.emit('game', '', (result) => {
 			console.log(result);
 			if (result.error) return navigate('/');
-			setState(result);
+			setState({
+				...state,
+				category: result.category,
+				word: result.word,
+				oddone: result.oddone,
+				stage: result.stage,
+				creator: result.creator,
+				instructions: result.instructions,
+				players: result.players,
+				chosen: result.chosen,
+				votes: result.votes || {},
+				voted: result.voted || [],
+			});
 		});
 
 		socket.on('game', (result) => {
@@ -43,6 +55,7 @@ export default function Game(props) {
 				players: result.players,
 				chosen: result.chosen,
 				votes: result.votes || {},
+				voted: result.voted || [],
 			});
 		});
 	}, []);
@@ -68,10 +81,6 @@ export default function Game(props) {
 
 	const onInsertVote = () => {
 		socket.emit('insert-vote', state.pick);
-		setState({
-			...state,
-			voted: true,
-		});
 	};
 
 	const getVoteSum = () => {
@@ -137,7 +146,7 @@ export default function Game(props) {
 				return (
 					<div>
 						وقت التصويت ({getVoteSum()}/{state.players.length})<br />
-						{state.voted && `قمت بالتصويت اتنظر`}
+						{state.voted.includes(socket.id) && `قمت بالتصويت اتنظر`}
 						<FormControl fullWidth>
 							<InputLabel>اختر</InputLabel>
 							<Select value={state.pick} onChange={onPickChange}>
@@ -148,7 +157,7 @@ export default function Game(props) {
 									})}
 							</Select>
 						</FormControl>
-						<Button variant='outlined' onClick={onInsertVote}>
+						<Button variant='outlined' onClick={onInsertVote} disabled={state.voted.includes(socket.id)}>
 							صوت
 						</Button>
 					</div>

@@ -4,7 +4,9 @@ const categories = require('./src/data.json');
 const getSocketById = (id) => io.sockets.sockets.get(id);
 
 let rooms = {};
-let users = {};
+let users = {
+	'?': '?',
+};
 
 let pending = [];
 let recovery_period = 3000; // If the time of a connection to the latest disconnection is less than this, the user will be reconnected
@@ -83,6 +85,41 @@ const attemptRecovery = (ip, socket, callback) => {
 
 		if (room.oddone == previous) {
 			room.oddone = current;
+		}
+		if (room.chosen == previous) {
+			room.chosen = current;
+		}
+
+		// Replace instructions and votes
+
+		if (room.instructions) {
+			room.instructions = {
+				previous: room.instructions.previous.map(([asker, askee]) => {
+					if (asker == previous) return [current, askee];
+					if (askee == previous) return [asker, current];
+					return [asker, askee];
+				}),
+				current: [room.instructions.current[0] == previous ? current : room.instructions.current[0], room.instructions.current[1] == previous ? current : room.instructions.current[1]],
+			};
+		}
+
+		if (room.votes) {
+			room.votes = Object.fromEntries(
+				Object.entries(room.votes).map(([user, votes]) => {
+					if (user == previous) {
+						return [current, votes];
+					}
+					return [user, votes];
+				})
+			);
+		}
+
+		if (room.voted && room.voted.includes(previous)) {
+			room.voted.splice(
+				room.voted.findIndex((e) => e == previous),
+				1
+			);
+			room.voted.push(current);
 		}
 
 		// socket.join(`room.${id}`);
@@ -183,11 +220,15 @@ io.on('connection', (socket) => {
 			}
 		}
 
+		if (rooms[id].voted == null) {
+			rooms[id].voted = [];
+		}
+
+		rooms[id].voted.push(socket.id);
+
 		console.log(`${socket.id} voted for ${data}`);
 		rooms[id].votes[data] += 1;
 		let voteSum = Object.values(rooms[id].votes).reduce((a, b) => a + b, 0);
-		console.log(rooms[id].votes);
-		console.log(voteSum);
 		room_data.players.map((player) => {
 			io.to(player).emit('game', {
 				word: room_data.word,
@@ -198,6 +239,7 @@ io.on('connection', (socket) => {
 				instructions: null,
 				chosen: null,
 				votes: rooms[id].votes,
+				voted: rooms[id].voted,
 				players: room_data.players.map((e) => {
 					return {
 						id: e,
@@ -221,6 +263,8 @@ io.on('connection', (socket) => {
 		if (room == undefined) return;
 
 		let [id, room_data] = room;
+
+		rooms[id].stage = 3;
 
 		room_data.players.map((player) => {
 			io.to(player).emit('game', {
@@ -266,6 +310,8 @@ io.on('connection', (socket) => {
 		let user = pick(minimums);
 
 		rooms[id].instructions.previous.push([user, null]);
+
+		rooms[id].chosen = user;
 
 		// let pick(sorted.filter(item => item[1] == sorted[0][1]).map(e => e[0]))
 		room_data.players.map((player) => {
@@ -328,6 +374,7 @@ io.on('connection', (socket) => {
 			let user = pick(minimums);
 
 			rooms[id].instructions.previous.push([user, null]);
+			rooms[id].chosen = user;
 
 			// let pick(sorted.filter(item => item[1] == sorted[0][1]).map(e => e[0]))
 			room_data.players.map((player) => {
@@ -414,12 +461,19 @@ io.on('connection', (socket) => {
 		}
 		let [id, room_data] = room;
 
+		console.log(room_data.chosen);
+
 		let object = {
 			word: room_data.word,
 			category: room_data.category,
 			oddone: room_data.oddone,
 			stage: room_data.stage,
 			creator: room_data.creator == socket.id,
+			voted: room_data.voted,
+
+			chosen: room_data.chosen,
+			votes: room_data.votes,
+			instructions: room_data.instructions == undefined ? [] : room_data.instructions.current,
 			players: room_data.players.map((e) => {
 				return {
 					id: e,
