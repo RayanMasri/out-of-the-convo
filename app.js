@@ -167,23 +167,27 @@ io.on('connection', (socket) => {
 					let [id, data] = room;
 
 					data.players.map((player) => {
-						io.to(player).emit('game', {
-							word: data.word,
-							category: data.category,
-							oddone: data.oddone,
-							stage: data.stage,
-							creator: data.creator == player,
-							voted: data.voted,
-							chosen: data.chosen,
-							votes: data.votes,
-							instructions: data.instructions == undefined ? [] : data.instructions.current,
-							players: data.players.map((e) => {
-								return {
-									id: e,
-									user: users[e],
-								};
-							}),
-						});
+						if (data.stage != -1) {
+							io.to(player).emit('game', {
+								word: data.word,
+								category: data.category,
+								oddone: data.oddone,
+								stage: data.stage,
+								creator: data.creator == player,
+								voted: data.voted,
+								chosen: data.chosen,
+								votes: data.votes,
+								instructions: data.instructions == undefined ? [] : data.instructions.current,
+								players: data.players.map((e) => {
+									return {
+										id: e,
+										user: users[e],
+									};
+								}),
+							});
+						}
+
+						io.to(player).emit('lobby', { users: data.players.map((e) => users[e]), creator: data.creator });
 					});
 				}
 			}
@@ -534,6 +538,7 @@ io.on('connection', (socket) => {
 	});
 
 	socket.on('start', (data, callback) => {
+		console.log('started');
 		let room = Object.entries(rooms).find(([id, room]) => room.creator == socket.id);
 		if (room == undefined) return;
 
