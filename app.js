@@ -70,12 +70,18 @@ const attemptRecovery = (ip, socket, callback) => {
 
 		let [id, room] = result[0];
 
+		console.log(`Fixing players`);
+		console.log(`Preivous: ${previous}`);
+		console.log(`Curernt: ${current}`);
 		let players = room.players;
+		console.log(players);
 		players.splice(
 			players.findIndex((id) => id == previous),
 			1
 		);
+		console.log(players);
 		players.push(current);
+		console.log(players);
 
 		rooms[id].players = players;
 
@@ -104,14 +110,20 @@ const attemptRecovery = (ip, socket, callback) => {
 		}
 
 		if (room.votes) {
-			room.votes = Object.fromEntries(
-				Object.entries(room.votes).map(([user, votes]) => {
-					if (user == previous) {
-						return [current, votes];
-					}
-					return [user, votes];
-				})
-			);
+			console.log(`Reconnecting, fixing votes`);
+			console.log(room.votes);
+			let entries = Object.entries(room.votes);
+			console.log(entries);
+			let votes = entries.find(([user, votes]) => user == previous)[1];
+			console.log(votes);
+			entries = entries.filter(([user, votes]) => user != previous);
+
+			console.log(entries);
+			entries.push([current, votes]);
+			console.log(entries);
+
+			room.votes = Object.fromEntries(entries);
+			console.log(room.votes);
 		}
 
 		if (room.voted && room.voted.includes(previous)) {
@@ -148,7 +160,34 @@ io.on('connection', (socket) => {
 	const ip = socket.handshake.headers['true-client-ip'];
 
 	if (pending.filter((item) => item.ip == ip).length != 0) {
-		attemptRecovery(ip, socket, (result) => {});
+		attemptRecovery(ip, socket, (result) => {
+			if (result) {
+				let room = Object.entries(rooms).find(([id, room]) => room.players.includes(socket.id));
+				if (room != undefined) {
+					let [id, data] = room;
+
+					data.players.map((player) => {
+						io.to(player).emit('game', {
+							word: data.word,
+							category: data.category,
+							oddone: data.oddone,
+							stage: data.stage,
+							creator: data.creator == player,
+							voted: data.voted,
+							chosen: data.chosen,
+							votes: data.votes,
+							instructions: data.instructions == undefined ? [] : data.instructions.current,
+							players: data.players.map((e) => {
+								return {
+									id: e,
+									user: users[e],
+								};
+							}),
+						});
+					});
+				}
+			}
+		});
 	}
 
 	console.log(`USER-ACTIVITY: "${socket.id}" connected`);
@@ -213,6 +252,7 @@ io.on('connection', (socket) => {
 		if (room == undefined) return;
 
 		let [id, room_data] = room;
+
 		if (room_data.votes == null) {
 			rooms[id].votes = {};
 
@@ -229,6 +269,13 @@ io.on('connection', (socket) => {
 
 		console.log(`${socket.id} voted for ${data}`);
 		rooms[id].votes[data] += 1;
+
+		console.log(room_data.players);
+		console.log(room_data.votes);
+		console.log(room_data.voted);
+		console.log(`Voter: ${socket.id}`);
+		console.log(`Voted: ${data}`);
+
 		let voteSum = Object.values(rooms[id].votes).reduce((a, b) => a + b, 0);
 		room_data.players.map((player) => {
 			io.to(player).emit('game', {
@@ -439,7 +486,7 @@ io.on('connection', (socket) => {
 				oddone: room_data.oddone,
 				stage: room_data.stage,
 				creator: room_data.creator == player,
-				instructions: pair.map((e) => users[e]),
+				instructions: pair,
 				players: room_data.players.map((e) => {
 					return {
 						id: e,

@@ -44,6 +44,7 @@ export default function Game(props) {
 		});
 
 		socket.on('game', (result) => {
+			console.log(result.players);
 			setState({
 				...state,
 				category: result.category,
@@ -89,6 +90,7 @@ export default function Game(props) {
 	};
 
 	const getStage = () => {
+		console.log(state.stage);
 		switch (state.stage) {
 			case 0:
 				return (
@@ -105,7 +107,7 @@ export default function Game(props) {
 				return (
 					<div className='flex flex-col justify-center items-center space-y-3'>
 						<div>
-							{state.instructions[0]} يقوم بسؤال {state.instructions[1]}
+							{state.players.find((e) => e.id == state.instructions[0]).user} يقوم بسؤال {state.players.find((e) => e.id == state.instructions[1]).user}
 						</div>
 						{state.creator && (
 							<Button variant='outlined' onClick={onNextAsk}>
