@@ -177,6 +177,7 @@ io.on('connection', (socket) => {
 				console.log(`GAME-ACTIVITY: Abandoning any previous rooms of user "${socket.id}" after ${recovery_period}ms`);
 
 				for (let [id, room] of Object.entries(rooms).filter(([id, room]) => room.players.includes(socket.id))) {
+					if (!rooms[id]) return;
 					if (room.creator == socket.id) {
 						room.players
 							.filter((player) => player != socket.id)
