@@ -206,7 +206,8 @@ io.on('connection', (socket) => {
 
 		// Get all disconnectable rooms
 		let disconnectable = Object.entries(rooms).filter(([id, room]) => room.players.includes(socket.id) && room.players.length == 1);
-		for (let [id, room] in disconnectable) {
+		for (let [id, room] of disconnectable) {
+			console.log(`Deleted room "${id}"`);
 			delete rooms[id];
 		}
 
@@ -229,9 +230,9 @@ io.on('connection', (socket) => {
 							});
 						delete rooms[id];
 					} else {
-						room[id].players = room[id].players.filter((player) => player != socket.id);
-						room[id].players.map((player) => {
-							io.to(player).emit('lobby', { users: room[id].players.map((e) => users[e]) });
+						rooms[id].players = rooms[id].players.filter((player) => player != socket.id);
+						rooms[id].players.map((player) => {
+							io.to(player).emit('lobby', { users: rooms[id].players.map((e) => users[e]) });
 						});
 					}
 				}
@@ -274,39 +275,53 @@ io.on('connection', (socket) => {
 		console.log(`${socket.id} voted for ${data}`);
 		rooms[id].votes[data] += 1;
 
-		console.log(room_data.players);
-		console.log(room_data.votes);
-		console.log(room_data.voted);
-		console.log(`Voter: ${socket.id}`);
-		console.log(`Voted: ${data}`);
+		// console.log(room_data.players);
+		// console.log(room_data.votes);
+		// console.log(room_data.voted);
+		// console.log(`Voter: ${socket.id}`);
+		// console.log(`Voted: ${data}`);
 
 		let voteSum = Object.values(rooms[id].votes).reduce((a, b) => a + b, 0);
-		room_data.players.map((player) => {
-			io.to(player).emit('game', {
-				word: room_data.word,
-				category: room_data.category,
-				oddone: room_data.oddone,
-				stage: voteSum == room_data.players.length ? 4 : 3,
-				creator: room_data.creator == player,
-				instructions: null,
-				chosen: null,
-				votes: rooms[id].votes,
-				voted: rooms[id].voted,
-				players: room_data.players.map((e) => {
-					return {
-						id: e,
-						user: users[e],
-					};
-				}),
-			});
-		});
 
 		if (voteSum == room_data.players.length) {
-			delete rooms[id];
+			// delete rooms[id];
 
-			for (let player of room_data.players) {
-				delete users[player];
-			}
+			// for (let player of room_data.players) {
+			// 	delete users[player];
+			// }
+			rooms[id] = {
+				word: null,
+				stage: -1,
+				category: '',
+				word: '',
+				oddone: null,
+				creator: room_data.creator,
+				players: room_data.players,
+			};
+
+			room_data.players.map((player) => {
+				io.to(player).emit('end');
+			});
+		} else {
+			room_data.players.map((player) => {
+				io.to(player).emit('game', {
+					word: room_data.word,
+					category: room_data.category,
+					oddone: room_data.oddone,
+					stage: voteSum == room_data.players.length ? 4 : 3,
+					creator: room_data.creator == player,
+					instructions: null,
+					chosen: null,
+					votes: rooms[id].votes,
+					voted: rooms[id].voted,
+					players: room_data.players.map((e) => {
+						return {
+							id: e,
+							user: users[e],
+						};
+					}),
+				});
+			});
 		}
 	});
 
@@ -504,16 +519,16 @@ io.on('connection', (socket) => {
 	socket.on('game', (data, callback) => {
 		let room = Object.entries(rooms).find(([id, room]) => room.players.includes(socket.id));
 		if (room == undefined) {
-			callback({ error: true });
+			callback({ error: true, route: '/' });
 			return;
 		}
-		if (room.stage == -1) {
-			callback({ error: true });
-			return;
-		}
+
 		let [id, room_data] = room;
 
-		console.log(room_data.chosen);
+		if (room_data.stage == -1) {
+			callback({ error: true, route: '/lobby' });
+			return;
+		}
 
 		let object = {
 			word: room_data.word,
@@ -572,6 +587,7 @@ io.on('connection', (socket) => {
 		callback({
 			users: room_data.players.map((socket) => users[socket]),
 			creator: socket.id == room_data.creator,
+			id: room_id,
 		});
 	});
 

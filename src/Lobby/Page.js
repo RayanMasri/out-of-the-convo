@@ -14,6 +14,7 @@ export default function Lobby() {
 		users: [],
 		category: 0,
 		creator: false,
+		id: '',
 	});
 	const _state = useRef(state);
 	const setState = (data) => {
@@ -49,6 +50,7 @@ export default function Lobby() {
 				...state,
 				users: result.users,
 				creator: result.creator,
+				id: result.id,
 			});
 		});
 
@@ -85,10 +87,11 @@ export default function Lobby() {
 					Users: {state.users.join(', ')} ({state.users.length})
 				</div>
 				{state.creator && (
-					<Button variant='outlined' onClick={onStart}>
+					<Button variant='outlined' onClick={onStart} disabled={state.users.length <= 2}>
 						Start
 					</Button>
 				)}
+				ID: {state.id}
 			</div>
 		</div>
 	);

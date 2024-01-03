@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 export default function Home() {
 	const [state, _setState] = useState({
 		error: '',
-		username: '',
+		username: localStorage.getItem('username') || '',
 		create: '',
 		join: '',
 		timeout: null,
@@ -76,11 +76,14 @@ export default function Home() {
 					id='user'
 					label='Username'
 					variant='filled'
+					value={state.username}
 					onChange={(event) => {
 						setState({
 							...state,
 							username: event.target.value,
 						});
+
+						localStorage.setItem('username', event.target.value);
 					}}
 				/>
 				<div className='w-full flex flex-row items-center justify-center h-fit space-x-3'>

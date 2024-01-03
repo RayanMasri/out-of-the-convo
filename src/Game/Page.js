@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { socket } from '../socket.js';
 import { useNavigate } from 'react-router-dom';
 import Button from '@mui/material/Button';
@@ -8,7 +8,7 @@ import FormControl from '@mui/material/FormControl';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 
 export default function Game(props) {
-	const [state, setState] = useState({
+	const [state, _setState] = useState({
 		category: '',
 		word: '',
 		oddone: '',
@@ -21,15 +21,20 @@ export default function Game(props) {
 		votes: {},
 		voted: [],
 	});
+	const _state = useRef(state);
+	const setState = (data) => {
+		_state.current = data;
+		_setState(data);
+	};
 
 	const navigate = useNavigate();
 
 	useEffect(() => {
 		socket.emit('game', '', (result) => {
 			console.log(result);
-			if (result.error) return navigate('/');
+			if (result.error) return navigate(result.route);
 			setState({
-				...state,
+				..._state.current,
 				category: result.category,
 				word: result.word,
 				oddone: result.oddone,
@@ -46,7 +51,7 @@ export default function Game(props) {
 		socket.on('game', (result) => {
 			console.log(result.players);
 			setState({
-				...state,
+				..._state.current,
 				category: result.category,
 				word: result.word,
 				oddone: result.oddone,
@@ -58,6 +63,17 @@ export default function Game(props) {
 				votes: result.votes || {},
 				voted: result.voted || [],
 			});
+		});
+
+		socket.on('end', (result) => {
+			setState({
+				..._state.current,
+				stage: 4,
+			});
+
+			setTimeout(() => {
+				navigate('/lobby');
+			}, 5000);
 		});
 	}, []);
 
